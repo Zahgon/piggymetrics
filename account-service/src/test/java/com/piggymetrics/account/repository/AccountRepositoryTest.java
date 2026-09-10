@@ -5,27 +5,28 @@ import com.piggymetrics.account.domain.Currency;
 import com.piggymetrics.account.domain.Item;
 import com.piggymetrics.account.domain.Saving;
 import com.piggymetrics.account.domain.TimePeriod;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.data.mongo.DataMongoTest;
-import org.springframework.test.context.junit4.SpringRunner;
+import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Date;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@RunWith(SpringRunner.class)
-@DataMongoTest
-public class AccountRepositoryTest {
+/**
+ * Runs against the MongoDB instance started by Quarkus Dev Services
+ * (replacement for the former embedded flapdoodle Mongo).
+ */
+@QuarkusTest
+class AccountRepositoryTest {
 
-	@Autowired
-	private AccountRepository repository;
+	@Inject
+	AccountRepository repository;
 
 	@Test
-	public void shouldFindAccountByName() {
+	void shouldFindAccountByName() {
 
 		Account stub = getStubAccount();
 		repository.save(stub);

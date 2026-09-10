@@ -1,16 +1,17 @@
 package com.piggymetrics.account;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit4.SpringRunner;
+import io.quarkus.test.junit.QuarkusTest;
+import org.junit.jupiter.api.Test;
 
-@RunWith(SpringRunner.class)
-@SpringBootTest
-public class AccountServiceApplicationTests {
+/**
+ * Replacement of the former {@code @SpringBootTest} smoke test: boots the whole Quarkus
+ * application (including Dev Services MongoDB) and fails if any bean cannot be wired.
+ */
+@QuarkusTest
+class AccountServiceApplicationTests {
 
 	@Test
-	public void contextLoads() {
+	void contextLoads() {
 
 	}
 

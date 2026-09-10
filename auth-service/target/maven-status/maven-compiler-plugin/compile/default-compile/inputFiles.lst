@@ -1,0 +1,11 @@
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/controller/DefaultJsonContentTypeFilter.java
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/controller/ErrorHandler.java
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/controller/UserController.java
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/domain/User.java
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/oauth/JwkService.java
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/oauth/JwksResource.java
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/oauth/OAuthClients.java
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/oauth/TokenResource.java
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/repository/UserRepository.java
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/service/UserService.java
+/Users/macbookpro/Downloads/migratiopn_script/piggymetrics/auth-service/src/main/java/com/piggymetrics/auth/service/UserServiceImpl.java

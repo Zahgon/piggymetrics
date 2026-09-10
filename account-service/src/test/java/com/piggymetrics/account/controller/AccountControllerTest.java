@@ -1,78 +1,68 @@
 package com.piggymetrics.account.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableList;
-import com.piggymetrics.account.domain.*;
+import com.piggymetrics.account.domain.Account;
+import com.piggymetrics.account.domain.Currency;
+import com.piggymetrics.account.domain.Item;
+import com.piggymetrics.account.domain.Saving;
+import com.piggymetrics.account.domain.TimePeriod;
+import com.piggymetrics.account.domain.User;
 import com.piggymetrics.account.service.AccountService;
-import com.sun.security.auth.UserPrincipal;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import io.quarkus.test.InjectMock;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity;
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.mockito.MockitoAnnotations.initMocks;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@RunWith(SpringRunner.class)
-@SpringBootTest
-public class AccountControllerTest {
+@QuarkusTest
+class AccountControllerTest {
 
-	private static final ObjectMapper mapper = new ObjectMapper();
-
-	@InjectMocks
-	private AccountController accountController;
-
-	@Mock
-	private AccountService accountService;
-
-	private MockMvc mockMvc;
-
-	@Before
-	public void setup() {
-		initMocks(this);
-		this.mockMvc = MockMvcBuilders.standaloneSetup(accountController).build();
-	}
+	@InjectMock
+	AccountService accountService;
 
 	@Test
-	public void shouldGetAccountByName() throws Exception {
+	@TestSecurity(user = "test", roles = { "server" })
+	void shouldGetAccountByName() {
 
 		final Account account = new Account();
 		account.setName("test");
 
 		when(accountService.findByName(account.getName())).thenReturn(account);
 
-		mockMvc.perform(get("/" + account.getName()))
-				.andExpect(jsonPath("$.name").value(account.getName()))
-				.andExpect(status().isOk());
+		given()
+				.when().get("/" + account.getName())
+				.then()
+				.statusCode(200)
+				.body("name", is(account.getName()));
 	}
 
 	@Test
-	public void shouldGetCurrentAccount() throws Exception {
+	@TestSecurity(user = "test")
+	void shouldGetCurrentAccount() {
 
 		final Account account = new Account();
 		account.setName("test");
 
 		when(accountService.findByName(account.getName())).thenReturn(account);
 
-		mockMvc.perform(get("/current").principal(new UserPrincipal(account.getName())))
-				.andExpect(jsonPath("$.name").value(account.getName()))
-				.andExpect(status().isOk());
+		given()
+				.when().get("/current")
+				.then()
+				.statusCode(200)
+				.body("name", is(account.getName()));
 	}
 
 	@Test
-	public void shouldSaveCurrentAccount() throws Exception {
+	@TestSecurity(user = "test")
+	void shouldSaveCurrentAccount() {
 
 		Saving saving = new Saving();
 		saving.setAmount(new BigDecimal(1500));
@@ -100,49 +90,65 @@ public class AccountControllerTest {
 		account.setNote("test note");
 		account.setLastSeen(new Date());
 		account.setSaving(saving);
-		account.setExpenses(ImmutableList.of(grocery));
-		account.setIncomes(ImmutableList.of(salary));
+		account.setExpenses(List.of(grocery));
+		account.setIncomes(List.of(salary));
 
-		String json = mapper.writeValueAsString(account);
-
-		mockMvc.perform(put("/current").principal(new UserPrincipal(account.getName())).contentType(MediaType.APPLICATION_JSON).content(json))
-				.andExpect(status().isOk());
+		given()
+				.contentType(ContentType.JSON)
+				.body(account)
+				.when().put("/current")
+				.then()
+				.statusCode(200);
 	}
 
 	@Test
-	public void shouldFailOnValidationTryingToSaveCurrentAccount() throws Exception {
+	@TestSecurity(user = "test")
+	void shouldFailOnValidationTryingToSaveCurrentAccount() {
 
 		final Account account = new Account();
 		account.setName("test");
 
-		String json = mapper.writeValueAsString(account);
-
-		mockMvc.perform(put("/current").principal(new UserPrincipal(account.getName())).contentType(MediaType.APPLICATION_JSON).content(json))
-				.andExpect(status().isBadRequest());
+		given()
+				.contentType(ContentType.JSON)
+				.body(account)
+				.when().put("/current")
+				.then()
+				.statusCode(400);
 	}
 
 	@Test
-	public void shouldRegisterNewAccount() throws Exception {
+	@TestSecurity(user = "test")
+	void shouldRegisterNewAccount() {
 
 		final User user = new User();
 		user.setUsername("test");
 		user.setPassword("password");
 
-		String json = mapper.writeValueAsString(user);
-		System.out.println(json);
-		mockMvc.perform(post("/").principal(new UserPrincipal("test")).contentType(MediaType.APPLICATION_JSON).content(json))
-				.andExpect(status().isOk());
+		final Account created = new Account();
+		created.setName(user.getUsername());
+
+		when(accountService.create(any(User.class))).thenReturn(created);
+
+		given()
+				.contentType(ContentType.JSON)
+				.body(user)
+				.when().post("/")
+				.then()
+				.statusCode(200);
 	}
 
 	@Test
-	public void shouldFailOnValidationTryingToRegisterNewAccount() throws Exception {
+	@TestSecurity(user = "test")
+	void shouldFailOnValidationTryingToRegisterNewAccount() {
 
 		final User user = new User();
 		user.setUsername("t");
 
-		String json = mapper.writeValueAsString(user);
-
-		mockMvc.perform(post("/").principal(new UserPrincipal("test")).contentType(MediaType.APPLICATION_JSON).content(json))
-				.andExpect(status().isBadRequest());
+		given()
+				.contentType(ContentType.JSON)
+				.body(user)
+				.when().post("/")
+				.then()
+				.statusCode(400);
 	}
 }

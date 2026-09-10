@@ -7,35 +7,43 @@ import com.piggymetrics.account.domain.Currency;
 import com.piggymetrics.account.domain.Saving;
 import com.piggymetrics.account.domain.User;
 import com.piggymetrics.account.repository.AccountRepository;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.util.Assert;
 
 import java.math.BigDecimal;
 import java.util.Date;
 
-@Service
+@ApplicationScoped
 public class AccountServiceImpl implements AccountService {
 
 	private final Logger log = LoggerFactory.getLogger(getClass());
 
-	@Autowired
-	private StatisticsServiceClient statisticsClient;
+	private final StatisticsServiceClient statisticsClient;
 
-	@Autowired
-	private AuthServiceClient authClient;
+	private final AuthServiceClient authClient;
 
-	@Autowired
-	private AccountRepository repository;
+	private final AccountRepository repository;
+
+	@Inject
+	public AccountServiceImpl(@RestClient StatisticsServiceClient statisticsClient,
+			@RestClient AuthServiceClient authClient,
+			AccountRepository repository) {
+		this.statisticsClient = statisticsClient;
+		this.authClient = authClient;
+		this.repository = repository;
+	}
 
 	/**
 	 * {@inheritDoc}
 	 */
 	@Override
 	public Account findByName(String accountName) {
-		Assert.hasLength(accountName);
+		if (accountName == null || accountName.isEmpty()) {
+			throw new IllegalArgumentException("[Assertion failed] - this String argument must have length; it must not be null or empty");
+		}
 		return repository.findByName(accountName);
 	}
 
@@ -46,7 +54,9 @@ public class AccountServiceImpl implements AccountService {
 	public Account create(User user) {
 
 		Account existing = repository.findByName(user.getUsername());
-		Assert.isNull(existing, "account already exists: " + user.getUsername());
+		if (existing != null) {
+			throw new IllegalArgumentException("account already exists: " + user.getUsername());
+		}
 
 		authClient.createUser(user);
 
@@ -76,7 +86,9 @@ public class AccountServiceImpl implements AccountService {
 	public void saveChanges(String name, Account update) {
 
 		Account account = repository.findByName(name);
-		Assert.notNull(account, "can't find account with name " + name);
+		if (account == null) {
+			throw new IllegalArgumentException("can't find account with name " + name);
+		}
 
 		account.setIncomes(update.getIncomes());
 		account.setExpenses(update.getExpenses());

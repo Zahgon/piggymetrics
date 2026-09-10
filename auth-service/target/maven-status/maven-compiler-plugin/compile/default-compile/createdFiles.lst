@@ -1,0 +1,12 @@
+com/piggymetrics/auth/domain/User.class
+com/piggymetrics/auth/repository/UserRepository.class
+com/piggymetrics/auth/oauth/OAuthClients.class
+com/piggymetrics/auth/oauth/TokenResource.class
+com/piggymetrics/auth/oauth/TokenResource$ClientCredentials.class
+com/piggymetrics/auth/controller/ErrorHandler.class
+com/piggymetrics/auth/oauth/JwkService.class
+com/piggymetrics/auth/oauth/JwksResource.class
+com/piggymetrics/auth/controller/DefaultJsonContentTypeFilter.class
+com/piggymetrics/auth/controller/UserController.class
+com/piggymetrics/auth/service/UserService.class
+com/piggymetrics/auth/service/UserServiceImpl.class

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwkService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">auth-service</a> &gt; <a href="index.source.html" class="el_package">com.piggymetrics.auth.oauth</a> &gt; <span class="el_source">JwkService.java</span></div><h1>JwkService.java</h1><pre class="source lang-java linenums">package com.piggymetrics.auth.oauth;
+
+import io.smallrye.jwt.util.KeyUtils;
+import jakarta.annotation.PostConstruct;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.PublicKey;
+import java.security.interfaces.RSAPublicKey;
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Exposes the RSA public key that matches the signing key as a JSON Web Key Set, and the
+ * key id used both in the JWKS and in the {@code kid} header of every issued token, so that
+ * resource servers (and this module's own smallrye-jwt verifier) can resolve the key.
+ */
+@ApplicationScoped
+public class JwkService {
+
+	private final String publicKeyLocation;
+
+	private Map&lt;String, Object&gt; jwk;
+
+	@Inject
+<span class="nc" id="L30">	public JwkService(@ConfigProperty(name = &quot;mp.jwt.verify.publickey.location&quot;) String publicKeyLocation) {</span>
+<span class="nc" id="L31">		this.publicKeyLocation = publicKeyLocation;</span>
+<span class="nc" id="L32">	}</span>
+
+	@PostConstruct
+	void init() {
+		try {
+<span class="nc" id="L37">			PublicKey publicKey = KeyUtils.readPublicKey(publicKeyLocation);</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">			if (!(publicKey instanceof RSAPublicKey rsaPublicKey)) {</span>
+<span class="nc" id="L39">				throw new IllegalStateException(</span>
+<span class="nc" id="L40">						&quot;expected an RSA public key at &quot; + publicKeyLocation + &quot; but got &quot; + publicKey.getAlgorithm());</span>
+			}
+<span class="nc" id="L42">			String n = base64Url(toUnsignedBytes(rsaPublicKey.getModulus().toByteArray()));</span>
+<span class="nc" id="L43">			String e = base64Url(toUnsignedBytes(rsaPublicKey.getPublicExponent().toByteArray()));</span>
+<span class="nc" id="L44">			this.jwk = Map.of(</span>
+					&quot;kty&quot;, &quot;RSA&quot;,
+					&quot;alg&quot;, &quot;RS256&quot;,
+					&quot;use&quot;, &quot;sig&quot;,
+<span class="nc" id="L48">					&quot;kid&quot;, thumbprint(n, e),</span>
+					&quot;n&quot;, n,
+					&quot;e&quot;, e);
+		}
+<span class="nc" id="L52">		catch (RuntimeException ex) {</span>
+<span class="nc" id="L53">			throw ex;</span>
+		}
+<span class="nc" id="L55">		catch (Exception ex) {</span>
+<span class="nc" id="L56">			throw new IllegalStateException(&quot;unable to read the JWT public key from &quot; + publicKeyLocation, ex);</span>
+<span class="nc" id="L57">		}</span>
+<span class="nc" id="L58">	}</span>
+
+	public String keyId() {
+<span class="nc" id="L61">		return (String) jwk.get(&quot;kid&quot;);</span>
+	}
+
+	/** RFC 7517 JSON Web Key Set holding the single active signing key. */
+	public Map&lt;String, Object&gt; jwks() {
+<span class="nc" id="L66">		return Map.of(&quot;keys&quot;, List.of(jwk));</span>
+	}
+
+	/** RFC 7638 thumbprint of the RSA key, used as a stable {@code kid}. */
+	private static String thumbprint(String n, String e) throws Exception {
+<span class="nc" id="L71">		String canonical = &quot;{\&quot;e\&quot;:\&quot;&quot; + e + &quot;\&quot;,\&quot;kty\&quot;:\&quot;RSA\&quot;,\&quot;n\&quot;:\&quot;&quot; + n + &quot;\&quot;}&quot;;</span>
+<span class="nc" id="L72">		byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;).digest(canonical.getBytes(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L73">		return base64Url(digest);</span>
+	}
+
+	/** BigInteger#toByteArray may prepend a zero sign byte; JWK wants the raw magnitude. */
+	private static byte[] toUnsignedBytes(byte[] twosComplement) {
+<span class="nc bnc" id="L78" title="All 4 branches missed.">		if (twosComplement.length &gt; 1 &amp;&amp; twosComplement[0] == 0) {</span>
+<span class="nc" id="L79">			byte[] trimmed = new byte[twosComplement.length - 1];</span>
+<span class="nc" id="L80">			System.arraycopy(twosComplement, 1, trimmed, 0, trimmed.length);</span>
+<span class="nc" id="L81">			return trimmed;</span>
+		}
+<span class="nc" id="L83">		return twosComplement;</span>
+	}
+
+	private static String base64Url(byte[] bytes) {
+<span class="nc" id="L87">		return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

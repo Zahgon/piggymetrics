@@ -3,37 +3,75 @@ package com.piggymetrics.account.controller;
 import com.piggymetrics.account.domain.Account;
 import com.piggymetrics.account.domain.User;
 import com.piggymetrics.account.service.AccountService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import io.quarkus.security.Authenticated;
+import io.quarkus.security.ForbiddenException;
+import io.quarkus.security.UnauthorizedException;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.SecurityContext;
+import org.jboss.resteasy.reactive.ResponseStatus;
 
-import javax.validation.Valid;
-import java.security.Principal;
-
-@RestController
+@Path("/")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
 public class AccountController {
 
-	@Autowired
-	private AccountService accountService;
+	/**
+	 * Scope granted to trusted back-end services; replaces the Spring
+	 * {@code @PreAuthorize("#oauth2.hasScope('server') or #name.equals('demo')")} check.
+	 */
+	private static final String SERVER_SCOPE = "server";
 
-	@PreAuthorize("#oauth2.hasScope('server') or #name.equals('demo')")
-	@RequestMapping(path = "/{name}", method = RequestMethod.GET)
-	public Account getAccountByName(@PathVariable String name) {
+	private static final String DEMO_ACCOUNT = "demo";
+
+	@Inject
+	AccountService accountService;
+
+	@Inject
+	SecurityIdentity identity;
+
+	@GET
+	@Path("/{name}")
+	public Account getAccountByName(@PathParam("name") String name, @Context SecurityContext securityContext) {
+		if (!DEMO_ACCOUNT.equals(name)) {
+			if (securityContext.getUserPrincipal() == null || identity.isAnonymous()) {
+				throw new UnauthorizedException();
+			}
+			if (!identity.hasRole(SERVER_SCOPE)) {
+				throw new ForbiddenException();
+			}
+		}
 		return accountService.findByName(name);
 	}
 
-	@RequestMapping(path = "/current", method = RequestMethod.GET)
-	public Account getCurrentAccount(Principal principal) {
-		return accountService.findByName(principal.getName());
+	@GET
+	@Path("/current")
+	@Authenticated
+	public Account getCurrentAccount(@Context SecurityContext securityContext) {
+		return accountService.findByName(securityContext.getUserPrincipal().getName());
 	}
 
-	@RequestMapping(path = "/current", method = RequestMethod.PUT)
-	public void saveCurrentAccount(Principal principal, @Valid @RequestBody Account account) {
-		accountService.saveChanges(principal.getName(), account);
+	@PUT
+	@Path("/current")
+	@Authenticated
+	@ResponseStatus(200)
+	public void saveCurrentAccount(@Context SecurityContext securityContext, @Valid Account account) {
+		accountService.saveChanges(securityContext.getUserPrincipal().getName(), account);
 	}
 
-	@RequestMapping(path = "/", method = RequestMethod.POST)
-	public Account createNewAccount(@Valid @RequestBody User user) {
+	@POST
+	@Path("/")
+	public Account createNewAccount(@Valid User user) {
 		return accountService.create(user);
 	}
 }

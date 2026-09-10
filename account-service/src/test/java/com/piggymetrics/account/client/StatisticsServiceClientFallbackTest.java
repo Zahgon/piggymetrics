@@ -1,43 +1,85 @@
 package com.piggymetrics.account.client;
 
 import com.piggymetrics.account.domain.Account;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.rule.OutputCapture;
-import org.springframework.test.context.junit4.SpringRunner;
+import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
-import static org.hamcrest.Matchers.containsString;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * @author cdov
+ *
+ * The statistics-service REST client points at an unreachable URL in the test profile, so
+ * every call fails and the MicroProfile Fault Tolerance {@code @Fallback} kicks in - the
+ * same observable behaviour as the former Hystrix fallback: no exception is propagated and
+ * the failure is logged.
  */
-@RunWith(SpringRunner.class)
-@SpringBootTest(properties = {
-        "feign.hystrix.enabled=true"
-})
-public class StatisticsServiceClientFallbackTest {
-    @Autowired
-    private StatisticsServiceClient statisticsServiceClient;
+@QuarkusTest
+class StatisticsServiceClientFallbackTest {
 
-    @Rule
-    public final OutputCapture outputCapture = new OutputCapture();
+    @Inject
+    @RestClient
+    StatisticsServiceClient statisticsServiceClient;
 
-    @Before
-    public void setup() {
-        outputCapture.reset();
+    private final List<LogRecord> records = new CopyOnWriteArrayList<>();
+
+    private final Handler outputCapture = new Handler() {
+        @Override
+        public void publish(LogRecord record) {
+            records.add(record);
+        }
+
+        @Override
+        public void flush() {
+        }
+
+        @Override
+        public void close() {
+        }
+    };
+
+    @BeforeEach
+    void setup() {
+        records.clear();
+        Logger.getLogger("").addHandler(outputCapture);
+    }
+
+    @AfterEach
+    void tearDown() {
+        Logger.getLogger("").removeHandler(outputCapture);
     }
 
     @Test
-    public void testUpdateStatisticsWithFailFallback(){
+    void testUpdateStatisticsWithFailFallback() {
         statisticsServiceClient.updateStatistics("test", new Account());
 
-        outputCapture.expect(containsString("Error during update statistics for account: test"));
-
+        assertTrue(records.stream().map(StatisticsServiceClientFallbackTest::render)
+                        .anyMatch(m -> m.contains("Error during update statistics for account: test")),
+                () -> "Expected fallback log message, captured: "
+                        + records.stream().map(StatisticsServiceClientFallbackTest::render).toList());
     }
 
+    private static String render(LogRecord record) {
+        String message = record.getMessage();
+        if (message == null) {
+            return "";
+        }
+        Object[] parameters = record.getParameters();
+        if (parameters != null) {
+            for (Object parameter : parameters) {
+                message = message.replaceFirst("\\{}|\\{\\d+}", String.valueOf(parameter));
+            }
+        }
+        return message;
+    }
 }
-

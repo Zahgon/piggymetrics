@@ -1,0 +1,12 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+auth-service,com.piggymetrics.auth.service,UserServiceImpl,45,0,0,0,12,0,3,0,3,0
+auth-service,com.piggymetrics.auth.controller,UserController,0,24,0,2,0,8,0,4,0,3
+auth-service,com.piggymetrics.auth.controller,DefaultJsonContentTypeFilter,5,31,2,8,1,6,2,5,0,2
+auth-service,com.piggymetrics.auth.controller,ErrorHandler,17,0,0,0,4,0,2,0,2,0
+auth-service,com.piggymetrics.auth.repository,UserRepository,13,0,0,0,4,0,3,0,3,0
+auth-service,com.piggymetrics.auth.domain,User,0,17,0,0,0,7,0,5,0,5
+auth-service,com.piggymetrics.auth.oauth,JwksResource,0,10,0,0,0,4,0,2,0,2
+auth-service,com.piggymetrics.auth.oauth,JwkService,125,0,6,0,28,0,10,0,7,0
+auth-service,com.piggymetrics.auth.oauth,TokenResource.ClientCredentials,12,53,3,3,4,8,3,2,0,2
+auth-service,com.piggymetrics.auth.oauth,OAuthClients,46,0,6,0,9,0,7,0,4,0
+auth-service,com.piggymetrics.auth.oauth,TokenResource,31,213,14,26,5,45,15,13,1,7

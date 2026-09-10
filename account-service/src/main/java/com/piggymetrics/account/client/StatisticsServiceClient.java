@@ -1,16 +1,28 @@
 package com.piggymetrics.account.client;
 
 import com.piggymetrics.account.domain.Account;
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
+import io.quarkus.oidc.client.filter.OidcClientFilter;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
-@FeignClient(name = "statistics-service", fallback = StatisticsServiceClientFallback.class)
+/**
+ * {@code @OidcClientFilter} attaches a {@code Bearer} token obtained from the default
+ * {@code quarkus.oidc-client} (account-service's own client_credentials, scope {@code server}).
+ * This is the replacement for Spring Cloud Security's {@code OAuth2FeignRequestInterceptor}.
+ */
+@OidcClientFilter
+@RegisterRestClient(configKey = "statistics-service")
 public interface StatisticsServiceClient {
 
-	@RequestMapping(method = RequestMethod.PUT, value = "/statistics/{accountName}", consumes = MediaType.APPLICATION_JSON_UTF8_VALUE)
-	void updateStatistics(@PathVariable("accountName") String accountName, Account account);
+	@PUT
+	@Path("/statistics/{accountName}")
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Fallback(StatisticsServiceClientFallback.class)
+	void updateStatistics(@PathParam("accountName") String accountName, Account account);
 
 }

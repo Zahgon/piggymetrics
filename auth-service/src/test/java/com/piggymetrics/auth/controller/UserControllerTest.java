@@ -1,74 +1,69 @@
 package com.piggymetrics.auth.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.piggymetrics.auth.domain.User;
 import com.piggymetrics.auth.service.UserService;
-import com.sun.security.auth.UserPrincipal;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import io.quarkus.test.InjectMock;
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity;
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.Test;
 
-import static org.mockito.MockitoAnnotations.initMocks;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.is;
+import static org.mockito.Mockito.verify;
 
-@RunWith(SpringRunner.class)
-@SpringBootTest
-public class UserControllerTest {
+@QuarkusTest
+class UserControllerTest {
 
-	private static final ObjectMapper mapper = new ObjectMapper();
-
-	@InjectMocks
-	private UserController accountController;
-
-	@Mock
-	private UserService userService;
-
-	private MockMvc mockMvc;
-
-	@Before
-	public void setup() {
-		initMocks(this);
-		this.mockMvc = MockMvcBuilders.standaloneSetup(accountController).build();
-	}
+	@InjectMock
+	UserService userService;
 
 	@Test
-	public void shouldCreateNewUser() throws Exception {
+	@TestSecurity(user = "test", roles = { "server" })
+	void shouldCreateNewUser() {
 
 		final User user = new User();
 		user.setUsername("test");
 		user.setPassword("password");
 
-		String json = mapper.writeValueAsString(user);
+		given()
+				.contentType(ContentType.JSON)
+				.body(user)
+				.when().post("/users")
+				.then()
+				.statusCode(200);
 
-		mockMvc.perform(post("/users").contentType(MediaType.APPLICATION_JSON).content(json))
-				.andExpect(status().isOk());
+		verify(userService).create(org.mockito.ArgumentMatchers.any(User.class));
 	}
 
 	@Test
-	public void shouldFailWhenUserIsNotValid() throws Exception {
-
-		final User user = new User();
-		user.setUsername("t");
-		user.setPassword("p");
-
-		mockMvc.perform(post("/users"))
-				.andExpect(status().isBadRequest());
+	@TestSecurity(user = "test", roles = { "server" })
+	void shouldFailWhenUserIsNotValid() {
+		// was: mockMvc.perform(post("/users")) - no body at all
+		given()
+				.contentType(ContentType.JSON)
+				.when().post("/users")
+				.then()
+				.statusCode(400);
 	}
 
 	@Test
-	public void shouldReturnCurrentUser() throws Exception {
-		mockMvc.perform(get("/users/current").principal(new UserPrincipal("test")))
-				.andExpect(jsonPath("$.name").value("test"))
-				.andExpect(status().isOk());
+	@TestSecurity(user = "test")
+	void shouldReturnCurrentUser() {
+		given()
+				.when().get("/users/current")
+				.then()
+				.statusCode(200)
+				.body("name", is("test"));
+	}
+
+	@Test
+	void shouldRejectUserCreationWithoutServerScope() {
+		given()
+				.contentType(ContentType.JSON)
+				.body(new User())
+				.when().post("/users")
+				.then()
+				.statusCode(401);
 	}
 }

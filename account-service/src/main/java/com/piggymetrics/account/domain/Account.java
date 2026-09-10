@@ -1,20 +1,20 @@
 package com.piggymetrics.account.domain;
 
-import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.quarkus.mongodb.panache.common.MongoEntity;
+import org.bson.codecs.pojo.annotations.BsonId;
 import org.hibernate.validator.constraints.Length;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
 
-import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.util.Date;
 import java.util.List;
 
-@Document(collection = "accounts")
+@MongoEntity(collection = "accounts")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Account {
 
-	@Id
+	@BsonId
 	private String name;
 
 	private Date lastSeen;

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OAuthClients.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">auth-service</a> &gt; <a href="index.source.html" class="el_package">com.piggymetrics.auth.oauth</a> &gt; <span class="el_source">OAuthClients.java</span></div><h1>OAuthClients.java</h1><pre class="source lang-java linenums">package com.piggymetrics.auth.oauth;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * In-memory client registry.
+ *
+ * &lt;p&gt;was: {@code OAuth2AuthorizationConfig#configure(ClientDetailsServiceConfigurer)}.
+ * Client secrets are compared as PLAINTEXT, exactly like the original which installed
+ * {@code NoOpPasswordEncoder} on the authorization server. User passwords stay BCrypt.&lt;/p&gt;
+ */
+@ApplicationScoped
+public class OAuthClients {
+
+	public static final String BROWSER_CLIENT_ID = &quot;browser&quot;;
+
+	public static final String SCOPE_UI = &quot;ui&quot;;
+	public static final String SCOPE_SERVER = &quot;server&quot;;
+
+	private final Map&lt;String, Optional&lt;String&gt;&gt; serviceClientSecrets;
+
+	@Inject
+	public OAuthClients(
+			@ConfigProperty(name = &quot;ACCOUNT_SERVICE_PASSWORD&quot;) Optional&lt;String&gt; accountServiceSecret,
+			@ConfigProperty(name = &quot;STATISTICS_SERVICE_PASSWORD&quot;) Optional&lt;String&gt; statisticsServiceSecret,
+<span class="nc" id="L31">			@ConfigProperty(name = &quot;NOTIFICATION_SERVICE_PASSWORD&quot;) Optional&lt;String&gt; notificationServiceSecret) {</span>
+<span class="nc" id="L32">		this.serviceClientSecrets = Map.of(</span>
+				&quot;account-service&quot;, accountServiceSecret,
+				&quot;statistics-service&quot;, statisticsServiceSecret,
+				&quot;notification-service&quot;, notificationServiceSecret);
+<span class="nc" id="L36">	}</span>
+
+	public boolean isBrowserClient(String clientId) {
+<span class="nc" id="L39">		return BROWSER_CLIENT_ID.equals(clientId);</span>
+	}
+
+	public boolean isServiceClient(String clientId) {
+<span class="nc" id="L43">		return serviceClientSecrets.containsKey(clientId);</span>
+	}
+
+	/**
+	 * Plaintext secret comparison for the {@code client_credentials} service clients.
+	 * A client whose secret is not configured (env var absent/blank) can never authenticate.
+	 */
+	public boolean matchesServiceClientSecret(String clientId, String providedSecret) {
+<span class="nc" id="L51">		Optional&lt;String&gt; configured = serviceClientSecrets.getOrDefault(clientId, Optional.empty());</span>
+<span class="nc bnc" id="L52" title="All 6 branches missed.">		if (configured.isEmpty() || configured.get().isBlank() || providedSecret == null) {</span>
+<span class="nc" id="L53">			return false;</span>
+		}
+<span class="nc" id="L55">		return configured.get().equals(providedSecret);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

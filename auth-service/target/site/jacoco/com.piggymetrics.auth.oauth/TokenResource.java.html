@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TokenResource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">auth-service</a> &gt; <a href="index.source.html" class="el_package">com.piggymetrics.auth.oauth</a> &gt; <span class="el_source">TokenResource.java</span></div><h1>TokenResource.java</h1><pre class="source lang-java linenums">package com.piggymetrics.auth.oauth;
+
+import com.piggymetrics.auth.domain.User;
+import com.piggymetrics.auth.repository.UserRepository;
+import io.quarkus.elytron.security.common.BcryptUtil;
+import io.smallrye.jwt.build.Jwt;
+import jakarta.annotation.security.PermitAll;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.FormParam;
+import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Base64;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * RFC 6749 token endpoint.
+ *
+ * &lt;p&gt;was: Spring Cloud Security's {@code @EnableAuthorizationServer} auto-registered
+ * {@code /oauth/token}. Supported grants are the ones the PiggyMetrics UI and the sibling
+ * services actually use:&lt;/p&gt;
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@code password} - public client {@code browser}, scope {@code ui} only;&lt;/li&gt;
+ *   &lt;li&gt;{@code client_credentials} - the three service clients, scope {@code server}.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;{@code refresh_token} was declared by the original client registry but is never
+ * exercised by the UI (the front-end re-runs the password grant), so it is deliberately
+ * NOT implemented; a request for it returns {@code unsupported_grant_type}.&lt;/p&gt;
+ *
+ * &lt;p&gt;Tokens were opaque + {@code InMemoryTokenStore}; they are now self-contained RS256
+ * JWTs verifiable through {@code /uaa/.well-known/jwks.json}.&lt;/p&gt;
+ */
+@Path(&quot;/oauth/token&quot;)
+public class TokenResource {
+
+	/** 12h - Spring's DefaultTokenServices default access token validity. */
+	private static final long EXPIRES_IN_SECONDS = 43200L;
+
+	private final UserRepository userRepository;
+	private final OAuthClients clients;
+	private final JwkService jwkService;
+	private final String issuer;
+
+	@Inject
+	public TokenResource(UserRepository userRepository, OAuthClients clients, JwkService jwkService,
+<span class="fc" id="L58">			@ConfigProperty(name = &quot;piggymetrics.jwt.issuer&quot;) String issuer) {</span>
+<span class="fc" id="L59">		this.userRepository = userRepository;</span>
+<span class="fc" id="L60">		this.clients = clients;</span>
+<span class="fc" id="L61">		this.jwkService = jwkService;</span>
+<span class="fc" id="L62">		this.issuer = issuer;</span>
+<span class="fc" id="L63">	}</span>
+
+	@POST
+	@PermitAll
+	@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response token(
+			@HeaderParam(HttpHeaders.AUTHORIZATION) String authorization,
+			@FormParam(&quot;grant_type&quot;) String grantType,
+			@FormParam(&quot;username&quot;) String username,
+			@FormParam(&quot;password&quot;) String password,
+			@FormParam(&quot;scope&quot;) String requestedScope,
+			@FormParam(&quot;client_id&quot;) String formClientId,
+			@FormParam(&quot;client_secret&quot;) String formClientSecret) {
+
+<span class="fc" id="L78">		ClientCredentials credentials = ClientCredentials.parse(authorization)</span>
+<span class="pc" id="L79">				.orElseGet(() -&gt; new ClientCredentials(formClientId, formClientSecret));</span>
+
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">		if (credentials.clientId() == null || credentials.clientId().isBlank()) {</span>
+<span class="nc" id="L82">			return error(Response.Status.UNAUTHORIZED, &quot;invalid_client&quot;, &quot;client authentication is required&quot;);</span>
+		}
+
+<span class="fc bfc" id="L85" title="All 2 branches covered.">		if (&quot;password&quot;.equals(grantType)) {</span>
+<span class="fc" id="L86">			return passwordGrant(credentials, username, password, requestedScope);</span>
+		}
+<span class="fc bfc" id="L88" title="All 2 branches covered.">		if (&quot;client_credentials&quot;.equals(grantType)) {</span>
+<span class="fc" id="L89">			return clientCredentialsGrant(credentials, requestedScope);</span>
+		}
+<span class="fc" id="L91">		return error(Response.Status.BAD_REQUEST, &quot;unsupported_grant_type&quot;,</span>
+				&quot;supported grant types are: password, client_credentials&quot;);
+	}
+
+	private Response passwordGrant(ClientCredentials credentials, String username, String password,
+			String requestedScope) {
+
+		// only the public `browser` client may run the password grant
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">		if (!clients.isBrowserClient(credentials.clientId())) {</span>
+<span class="nc" id="L100">			return error(Response.Status.UNAUTHORIZED, &quot;invalid_client&quot;,</span>
+					&quot;client is not allowed to use the password grant&quot;);
+		}
+		// `browser` is a public client registered without a secret - accept absent/empty only
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">		if (credentials.clientSecret() != null &amp;&amp; !credentials.clientSecret().isEmpty()) {</span>
+<span class="nc" id="L105">			return error(Response.Status.UNAUTHORIZED, &quot;invalid_client&quot;, &quot;unknown client credentials&quot;);</span>
+		}
+		// a UI user must never be able to mint a service-scope token
+<span class="fc bfc" id="L108" title="All 2 branches covered.">		if (!isScopeAllowed(requestedScope, OAuthClients.SCOPE_UI)) {</span>
+<span class="fc" id="L109">			return error(Response.Status.BAD_REQUEST, &quot;invalid_scope&quot;,</span>
+					&quot;client 'browser' is limited to the '&quot; + OAuthClients.SCOPE_UI + &quot;' scope&quot;);
+		}
+<span class="pc bpc" id="L112" title="4 of 8 branches missed.">		if (username == null || username.isBlank() || password == null || password.isEmpty()) {</span>
+<span class="nc" id="L113">			return error(Response.Status.BAD_REQUEST, &quot;invalid_request&quot;, &quot;username and password are required&quot;);</span>
+		}
+
+<span class="fc" id="L116">		Optional&lt;User&gt; user = userRepository.findByUsername(username);</span>
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">		if (user.isEmpty() || !BcryptUtil.matches(password, user.get().getPassword())) {</span>
+<span class="fc" id="L118">			return error(Response.Status.BAD_REQUEST, &quot;invalid_grant&quot;, &quot;bad credentials&quot;);</span>
+		}
+
+<span class="fc" id="L121">		return issue(user.get().getUsername(), credentials.clientId(), OAuthClients.SCOPE_UI);</span>
+	}
+
+	private Response clientCredentialsGrant(ClientCredentials credentials, String requestedScope) {
+
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">		if (!clients.isServiceClient(credentials.clientId())</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">				|| !clients.matchesServiceClientSecret(credentials.clientId(), credentials.clientSecret())) {</span>
+<span class="fc" id="L128">			return error(Response.Status.UNAUTHORIZED, &quot;invalid_client&quot;, &quot;unknown client credentials&quot;);</span>
+		}
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">		if (!isScopeAllowed(requestedScope, OAuthClients.SCOPE_SERVER)) {</span>
+<span class="nc" id="L131">			return error(Response.Status.BAD_REQUEST, &quot;invalid_scope&quot;,</span>
+					&quot;service clients are limited to the '&quot; + OAuthClients.SCOPE_SERVER + &quot;' scope&quot;);
+		}
+<span class="fc" id="L134">		return issue(credentials.clientId(), credentials.clientId(), OAuthClients.SCOPE_SERVER);</span>
+	}
+
+	/** An absent scope defaults to the client's only registered scope; anything else must match it. */
+	private static boolean isScopeAllowed(String requestedScope, String allowedScope) {
+<span class="pc bpc" id="L139" title="2 of 6 branches missed.">		return requestedScope == null || requestedScope.isBlank() || allowedScope.equals(requestedScope.trim());</span>
+	}
+
+	private Response issue(String name, String clientId, String scope) {
+<span class="fc" id="L143">		String accessToken = Jwt.issuer(issuer)</span>
+<span class="fc" id="L144">				.subject(name)</span>
+<span class="fc" id="L145">				.upn(name)</span>
+				// MP-JWT `groups` mirrors the scope so @RolesAllowed(&quot;server&quot;) works locally,
+				// while `scope` is what the sibling resource servers map onto roles.
+<span class="fc" id="L148">				.groups(Set.of(scope))</span>
+<span class="fc" id="L149">				.claim(&quot;scope&quot;, scope)</span>
+<span class="fc" id="L150">				.claim(&quot;client_id&quot;, clientId)</span>
+<span class="fc" id="L151">				.expiresIn(Duration.ofSeconds(EXPIRES_IN_SECONDS))</span>
+<span class="fc" id="L152">				.jws().keyId(jwkService.keyId())</span>
+<span class="fc" id="L153">				.sign();</span>
+
+<span class="fc" id="L155">		return Response.ok(Map.of(</span>
+				&quot;access_token&quot;, accessToken,
+				&quot;token_type&quot;, &quot;Bearer&quot;,
+<span class="fc" id="L158">				&quot;expires_in&quot;, EXPIRES_IN_SECONDS,</span>
+<span class="fc" id="L159">				&quot;scope&quot;, scope)).build();</span>
+	}
+
+	private static Response error(Response.Status status, String error, String description) {
+<span class="fc" id="L163">		return Response.status(status)</span>
+<span class="fc" id="L164">				.entity(Map.of(&quot;error&quot;, error, &quot;error_description&quot;, description))</span>
+<span class="fc" id="L165">				.type(MediaType.APPLICATION_JSON)</span>
+<span class="fc" id="L166">				.build();</span>
+	}
+
+	/** HTTP Basic client authentication, parsed by hand: this endpoint is unauthenticated. */
+<span class="fc" id="L170">	record ClientCredentials(String clientId, String clientSecret) {</span>
+
+		static Optional&lt;ClientCredentials&gt; parse(String authorizationHeader) {
+<span class="pc bpc" id="L173" title="2 of 4 branches missed.">			if (authorizationHeader == null || !authorizationHeader.regionMatches(true, 0, &quot;Basic &quot;, 0, 6)) {</span>
+<span class="nc" id="L174">				return Optional.empty();</span>
+			}
+			byte[] decoded;
+			try {
+<span class="fc" id="L178">				decoded = Base64.getDecoder().decode(authorizationHeader.substring(6).trim());</span>
+			}
+<span class="nc" id="L180">			catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L181">				return Optional.empty();</span>
+<span class="fc" id="L182">			}</span>
+<span class="fc" id="L183">			String value = new String(decoded, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L184">			int separator = value.indexOf(':');</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">			if (separator &lt; 0) {</span>
+<span class="nc" id="L186">				return Optional.of(new ClientCredentials(value, &quot;&quot;));</span>
+			}
+<span class="fc" id="L188">			return Optional.of(new ClientCredentials(value.substring(0, separator), value.substring(separator + 1)));</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

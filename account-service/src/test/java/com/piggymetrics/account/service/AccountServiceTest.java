@@ -2,25 +2,34 @@ package com.piggymetrics.account.service;
 
 import com.piggymetrics.account.client.AuthServiceClient;
 import com.piggymetrics.account.client.StatisticsServiceClient;
-import com.piggymetrics.account.domain.*;
+import com.piggymetrics.account.domain.Account;
+import com.piggymetrics.account.domain.Currency;
+import com.piggymetrics.account.domain.Item;
+import com.piggymetrics.account.domain.Saving;
+import com.piggymetrics.account.domain.TimePeriod;
+import com.piggymetrics.account.domain.User;
 import com.piggymetrics.account.repository.AccountRepository;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.mockito.Mockito.*;
-import static org.mockito.MockitoAnnotations.initMocks;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-public class AccountServiceTest {
-
-	@InjectMocks
-	private AccountServiceImpl accountService;
+/**
+ * Plain Mockito unit test - the service has no framework dependency any more, so no
+ * container is needed. Collaborators are injected through the constructor.
+ */
+class AccountServiceTest {
 
 	@Mock
 	private StatisticsServiceClient statisticsClient;
@@ -31,30 +40,35 @@ public class AccountServiceTest {
 	@Mock
 	private AccountRepository repository;
 
-	@Before
-	public void setup() {
-		initMocks(this);
+	@InjectMocks
+	private AccountServiceImpl accountService;
+
+	private AutoCloseable mocks;
+
+	@BeforeEach
+	void setup() {
+		mocks = MockitoAnnotations.openMocks(this);
 	}
 
 	@Test
-	public void shouldFindByName() {
+	void shouldFindByName() {
 
 		final Account account = new Account();
 		account.setName("test");
 
-		when(accountService.findByName(account.getName())).thenReturn(account);
+		when(repository.findByName(account.getName())).thenReturn(account);
 		Account found = accountService.findByName(account.getName());
 
 		assertEquals(account, found);
 	}
 
-	@Test(expected = IllegalArgumentException.class)
-	public void shouldFailWhenNameIsEmpty() {
-		accountService.findByName("");
+	@Test
+	void shouldFailWhenNameIsEmpty() {
+		assertThrows(IllegalArgumentException.class, () -> accountService.findByName(""));
 	}
 
 	@Test
-	public void shouldCreateAccountWithGivenUser() {
+	void shouldCreateAccountWithGivenUser() {
 
 		User user = new User();
 		user.setUsername("test");
@@ -74,7 +88,7 @@ public class AccountServiceTest {
 	}
 
 	@Test
-	public void shouldSaveChangesWhenUpdatedAccountGiven() {
+	void shouldSaveChangesWhenUpdatedAccountGiven() {
 
 		Item grocery = new Item();
 		grocery.setTitle("Grocery");
@@ -106,7 +120,7 @@ public class AccountServiceTest {
 
 		final Account account = new Account();
 
-		when(accountService.findByName("test")).thenReturn(account);
+		when(repository.findByName("test")).thenReturn(account);
 		accountService.saveChanges("test", update);
 
 		assertEquals(update.getNote(), account.getNote());
@@ -126,24 +140,29 @@ public class AccountServiceTest {
 		assertEquals(update.getExpenses().get(0).getCurrency(), account.getExpenses().get(0).getCurrency());
 		assertEquals(update.getExpenses().get(0).getPeriod(), account.getExpenses().get(0).getPeriod());
 		assertEquals(update.getExpenses().get(0).getIcon(), account.getExpenses().get(0).getIcon());
-		
+
 		assertEquals(update.getIncomes().get(0).getTitle(), account.getIncomes().get(0).getTitle());
 		assertEquals(0, update.getIncomes().get(0).getAmount().compareTo(account.getIncomes().get(0).getAmount()));
 		assertEquals(update.getIncomes().get(0).getCurrency(), account.getIncomes().get(0).getCurrency());
 		assertEquals(update.getIncomes().get(0).getPeriod(), account.getIncomes().get(0).getPeriod());
 		assertEquals(update.getIncomes().get(0).getIcon(), account.getIncomes().get(0).getIcon());
-		
+
 		verify(repository, times(1)).save(account);
 		verify(statisticsClient, times(1)).updateStatistics("test", account);
 	}
 
-	@Test(expected = IllegalArgumentException.class)
-	public void shouldFailWhenNoAccountsExistedWithGivenName() {
+	@Test
+	void shouldFailWhenNoAccountsExistedWithGivenName() {
 		final Account update = new Account();
 		update.setIncomes(Arrays.asList(new Item()));
 		update.setExpenses(Arrays.asList(new Item()));
 
-		when(accountService.findByName("test")).thenReturn(null);
-		accountService.saveChanges("test", update);
+		when(repository.findByName("test")).thenReturn(null);
+		assertThrows(IllegalArgumentException.class, () -> accountService.saveChanges("test", update));
+	}
+
+	@org.junit.jupiter.api.AfterEach
+	void tearDown() throws Exception {
+		mocks.close();
 	}
 }

@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.piggymetrics.auth.oauth.TokenResourceTest
+-------------------------------------------------------------------------------
+Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.109 s -- in com.piggymetrics.auth.oauth.TokenResourceTest

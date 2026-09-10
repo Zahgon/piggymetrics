@@ -1,12 +1,21 @@
 package com.piggymetrics.account.repository;
 
 import com.piggymetrics.account.domain.Account;
-import org.springframework.data.repository.CrudRepository;
-import org.springframework.stereotype.Repository;
+import io.quarkus.mongodb.panache.PanacheMongoRepositoryBase;
+import jakarta.enterprise.context.ApplicationScoped;
 
-@Repository
-public interface AccountRepository extends CrudRepository<Account, String> {
+@ApplicationScoped
+public class AccountRepository implements PanacheMongoRepositoryBase<Account, String> {
 
-	Account findByName(String name);
+	public Account findByName(String name) {
+		return find("_id", name).firstResult();
+	}
 
+	/**
+	 * Inserts or updates the given account, keyed by its name (the Mongo {@code _id}).
+	 * Panache equivalent of the former Spring Data {@code CrudRepository#save}.
+	 */
+	public void save(Account account) {
+		persistOrUpdate(account);
+	}
 }

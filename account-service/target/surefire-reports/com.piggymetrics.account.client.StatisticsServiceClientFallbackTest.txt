@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.piggymetrics.account.client.StatisticsServiceClientFallbackTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.301 s -- in com.piggymetrics.account.client.StatisticsServiceClientFallbackTest

@@ -1,60 +1,42 @@
 package com.piggymetrics.auth.domain;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
+import io.quarkus.mongodb.panache.common.MongoEntity;
+import jakarta.validation.constraints.NotBlank;
+import org.bson.codecs.pojo.annotations.BsonId;
 
-import java.util.List;
+/**
+ * Plain POJO persisted into the {@code users} collection, keyed by {@code username}
+ * (the Mongo {@code _id}).
+ *
+ * <p>was: {@code @Document(collection = "users")} + Spring Security {@code UserDetails}.
+ * The {@code UserDetails} contract (authorities / isEnabled / isAccountNonLocked ...) is
+ * dropped: nothing in the original code consumed it beyond the password comparison, and the
+ * Quarkus token endpoint reads the BCrypt hash directly.</p>
+ */
+@MongoEntity(collection = "users")
+public class User {
 
-@Document(collection = "users")
-public class User implements UserDetails {
-
-	@Id
+	// was: @org.springframework.data.annotation.Id
+	@BsonId
+	@NotBlank
 	private String username;
 
+	@NotBlank
 	private String password;
 
-	@Override
-	public String getPassword() {
-		return password;
-	}
-
-	@Override
 	public String getUsername() {
 		return username;
-	}
-
-	@Override
-	public List<GrantedAuthority> getAuthorities() {
-		return null;
 	}
 
 	public void setUsername(String username) {
 		this.username = username;
 	}
 
+	public String getPassword() {
+		return password;
+	}
+
 	public void setPassword(String password) {
 		this.password = password;
-	}
-
-	@Override
-	public boolean isAccountNonExpired() {
-		return true;
-	}
-
-	@Override
-	public boolean isAccountNonLocked() {
-		return true;
-	}
-
-	@Override
-	public boolean isCredentialsNonExpired() {
-		return true;
-	}
-
-	@Override
-	public boolean isEnabled() {
-		return true;
 	}
 }

@@ -2,32 +2,36 @@ package com.piggymetrics.auth.service;
 
 import com.piggymetrics.auth.domain.User;
 import com.piggymetrics.auth.repository.UserRepository;
+import io.quarkus.elytron.security.common.BcryptUtil;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.util.Assert;
 
 import java.util.Optional;
 
-@Service
+@ApplicationScoped
 public class UserServiceImpl implements UserService {
 
 	private final Logger log = LoggerFactory.getLogger(getClass());
 
-	private static final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+	private final UserRepository repository;
 
-	@Autowired
-	private UserRepository repository;
+	@Inject
+	public UserServiceImpl(UserRepository repository) {
+		this.repository = repository;
+	}
 
 	@Override
 	public void create(User user) {
 
-		Optional<User> existing = repository.findById(user.getUsername());
-		existing.ifPresent(it-> {throw new IllegalArgumentException("user already exists: " + it.getUsername());});
+		Optional<User> existing = repository.findByUsername(user.getUsername());
+		existing.ifPresent(it -> {
+			throw new IllegalArgumentException("user already exists: " + it.getUsername());
+		});
 
-		String hash = encoder.encode(user.getPassword());
+		// was: new BCryptPasswordEncoder().encode(...) - BcryptUtil emits the same $2a$ format
+		String hash = BcryptUtil.bcryptHash(user.getPassword());
 		user.setPassword(hash);
 
 		repository.save(user);
